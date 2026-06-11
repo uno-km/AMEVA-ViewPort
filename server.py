@@ -684,7 +684,7 @@ def create_app(args):
         control_granted = False
         if request_control:
             # 제어 토큰이 맞고, 아직 제어권자가 없을 때만 부여
-            if control_token == app["control_token"] and app["state"][" controller_id"] is None:
+            if control_token == app["control_token"] and app["state"]["controller_id"] is None:
                 control_granted = True
             else:
                 control_granted = False
@@ -797,6 +797,13 @@ def create_app(args):
         )
         
         await pc.setLocalDescription(answer)
+# ⚠️ 이 return 문이 반드시 앞 공백 8칸이어야 갱신된 세션을 정상 반환합니다!
+        return web.json_response({
+            "sdp": pc.localDescription.sdp,
+            "type": pc.localDescription.type,
+            "control_granted": control_granted,
+        })
+
 
     async def on_shutdown(app):
         logger.info("서버 종료 중... 모든 PeerConnection 정리")
