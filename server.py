@@ -49,6 +49,23 @@ HTML_PAGE = r"""
       display: flex;
       flex-direction: column;
       height: 100vh;
+      overflow: hidden;
+    }
+
+    /* 상단 메뉴들을 하나로 묶는 컨테이너 */
+    .control-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      z-index: 9999;
+      transition: transform 0.2s ease-in-out;
+      transform: translateY(0);
+    }
+
+    /* 💡 전체화면 모드이면서 자동 숨김일 때 위로 숨기기 */
+    body.fullscreen-mode .control-header.hidden {
+      transform: translateY(-100%);
     }
 
     .topbar {
@@ -78,11 +95,7 @@ HTML_PAGE = r"""
       background: #0f172a;
       color: #e2e8f0;
       outline: none;
-      min-width: 180px;
-    }
-
-    .topbar input[type="checkbox"] {
-      transform: translateY(1px);
+      min-width: 150px;
     }
 
     .topbar button {
@@ -96,22 +109,8 @@ HTML_PAGE = r"""
       cursor: pointer;
     }
 
-    .topbar button:hover {
-      background: #1d4ed8;
-    }
-
-    .status {
-      font-size: 13px;
-      color: #93c5fd;
-      margin-left: auto;
-    }
-
-    .main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-    }
+    .topbar button:hover { background: #1d4ed8; }
+    .status { font-size: 13px; color: #93c5fd; margin-left: auto; }
 
     .help {
       padding: 8px 16px;
@@ -119,6 +118,24 @@ HTML_PAGE = r"""
       color: #94a3b8;
       border-bottom: 1px solid #1f2937;
       background: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* 메인 영역: 헤더 두께만큼 상단 여백을 기본으로 가짐 */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      padding-top: 95px; /* 기본 헤더 높이만큼 여백 */
+      transition: padding-top 0.2s ease-in-out;
+    }
+
+    /* 💡 전체화면 모드일 때는 영상이 브라우저를 꽉 채우도록 여백 제거 */
+    body.fullscreen-mode .main {
+      padding-top: 0;
     }
 
     .video-wrap {
@@ -128,16 +145,19 @@ HTML_PAGE = r"""
       justify-content: center;
       align-items: center;
       background: #000;
-      padding: 12px;
+      overflow: hidden;
     }
 
     video {
-      max-width: 100%;
-      max-height: 100%;
-      border-radius: 14px;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
       background: #000;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.45);
       outline: none;
+      user-select: none;
+      -webkit-user-drag: none;
+      cursor: crosshair;
+      pointer-events: auto;
     }
 
     .pill {
@@ -151,53 +171,39 @@ HTML_PAGE = r"""
       color: #cbd5e1;
       font-size: 12px;
     }
-
-    .ok {
-      color: #22c55e;
-    }
-
-    .warn {
-      color: #f59e0b;
-    }
-
-    .danger {
-      color: #ef4444;
-    }
+    .ok { color: #22c55e; }
+    .warn { color: #f59e0b; }
+    .danger { color: #ef4444; }
   </style>
 </head>
 <body>
-  <div class="topbar">
-    <label>
-      보기 토큰
-      <input id="accessToken" type="password" placeholder="access token" />
-    </label>
 
-    <label>
-      제어 토큰
-      <input id="controlToken" type="password" placeholder="control token (선택)" />
-    </label>
+  <div id="controlHeader" class="control-header">
+    <div class="topbar">
+      <label>보기 토큰 <input id="accessToken" type="password" value="91199837" /></label>
+      <label>제어 토큰 <input id="controlToken" type="password" value="91199837" /></label>
+      <label><input id="requestControl" type="checkbox" checked /> 제어권 요청</label>
+      
+      <label style="color: #f59e0b; font-weight: bold;">
+        <input id="fullscreenCheck" type="checkbox" /> 전체화면 모드
+      </label>
 
-    <label>
-      <input id="requestControl" type="checkbox" />
-      제어권 요청
-    </label>
+      <button id="startBtn">연결 시작</button>
+      <button id="disconnectBtn">연결 종료</button>
+      <span id="status" class="status">대기 중</span>
+    </div>
 
-    <button id="startBtn">연결 시작</button>
-    <button id="disconnectBtn">연결 종료</button>
-
-    <span id="status" class="status">대기 중</span>
-  </div>
-
-  <div class="help">
-    <span class="pill">최대 동시 접속 2명</span>
-    <span class="pill">제어권은 1명만 가능</span>
-    <span class="pill" id="controlBadge">제어 상태: 없음</span>
-    <span class="pill">영상 위에서 클릭 후 마우스/키보드 입력 가능</span>
+    <div class="help">
+      <span class="pill">최대 동시 접속 2명</span>
+      <span class="pill">제어권은 1명만 가능</span>
+      <span class="pill" id="controlBadge">제어 상태: 없음</span>
+      <span class="pill">영상 클릭 후 입력 가능</span>
+    </div>
   </div>
 
   <div class="main">
     <div class="video-wrap">
-      <video id="video" autoplay playsinline controls></video>
+      <video id="video" autoplay playsinline tabindex="0"></video>
     </div>
   </div>
 
@@ -211,6 +217,10 @@ HTML_PAGE = r"""
     const videoEl = document.getElementById("video");
     const statusEl = document.getElementById("status");
     const controlBadgeEl = document.getElementById("controlBadge");
+    
+    // UI 요소 조작용
+    const controlHeader = document.getElementById("controlHeader");
+    const fullscreenCheck = document.getElementById("fullscreenCheck");
 
     function setStatus(text, cls = "") {
       statusEl.textContent = text;
@@ -222,28 +232,58 @@ HTML_PAGE = r"""
       controlBadgeEl.className = "pill " + (hasControl ? "ok" : "");
     }
 
+    // 💡 전체화면 및 마우스 탑 바 숨김 인터랙션 로직
+    fullscreenCheck.addEventListener("change", (e) => {
+      if (e.target.checked) {
+        document.body.classList.add("fullscreen-mode");
+        controlHeader.classList.add("hidden"); // 즉시 숨김
+      } else {
+        document.body.classList.remove("fullscreen-mode");
+        controlHeader.classList.remove("hidden"); // 상시 고정
+      }
+    });
+
+    // 화면 최상단에 마우스가 도달하면 메뉴바를 내려주는 이벤트
+    document.addEventListener("mousemove", (e) => {
+      if (!fullscreenCheck.checked) return;
+
+      // 마우스 Y 좌표가 상단 15픽셀 이하 영역으로 들어가면 메뉴 노출
+      if (e.clientY <= 15) {
+        controlHeader.classList.remove("hidden");
+      } 
+      // 마우스가 메뉴바 영역(높이 약 95px)을 벗어나 아래로 내려가면 다시 숨김
+      else if (e.clientY > 105) {
+        controlHeader.classList.add("hidden");
+      }
+    });
+
     function waitForIceGatheringComplete(pc) {
       return new Promise((resolve) => {
-        if (pc.iceGatheringState === "complete") {
-          resolve();
-          return;
-        }
-
+        if (pc.iceGatheringState === "complete") { resolve(); return; }
         function checkState() {
           if (pc.iceGatheringState === "complete") {
             pc.removeEventListener("icegatheringstatechange", checkState);
             resolve();
           }
         }
-
         pc.addEventListener("icegatheringstatechange", checkState);
       });
     }
 
     function normalizePointerFromEvent(event) {
       const rect = videoEl.getBoundingClientRect();
-      const x = (event.clientX - rect.left) / rect.width;
-      const y = (event.clientY - rect.top) / rect.height;
+      const vw = videoEl.videoWidth;
+      const vh = videoEl.videoHeight;
+      if (vw === 0 || vh === 0) return { x: 0, y: 0 };
+
+      const scale = Math.min(rect.width / vw, rect.height / vh);
+      const actualWidth = vw * scale;
+      const actualHeight = vh * scale;
+      const offsetX = (rect.width - actualWidth) / 2;
+      const offsetY = (rect.height - actualHeight) / 2;
+
+      let x = (event.clientX - rect.left - offsetX) / actualWidth;
+      let y = (event.clientY - rect.top - offsetY) / actualHeight;
 
       return {
         x: Math.max(0, Math.min(1, x)),
@@ -258,34 +298,21 @@ HTML_PAGE = r"""
     }
 
     function bindInputEvents() {
-      // 영상 클릭 시 포커스 확보
-      videoEl.tabIndex = 0;
-      videoEl.addEventListener("click", () => {
-        videoEl.focus();
-      });
+      videoEl.addEventListener("click", () => { videoEl.focus(); });
+      videoEl.addEventListener("contextmenu", (e) => { e.preventDefault(); });
 
-      // 우클릭 메뉴 방지
-      videoEl.addEventListener("contextmenu", (e) => {
-        e.preventDefault();
-      });
-
-      // 마우스 이동 (과도한 전송 방지를 위해 20ms 제한)
       videoEl.addEventListener("mousemove", (e) => {
         if (!hasControl) return;
+        e.preventDefault();
 
         const now = performance.now();
         if (now - lastMouseMoveTs < 20) return;
         lastMouseMoveTs = now;
 
         const p = normalizePointerFromEvent(e);
-        sendControlMessage({
-          type: "mouse_move",
-          x: p.x,
-          y: p.y
-        });
+        sendControlMessage({ type: "mouse_move", x: p.x, y: p.y });
       });
 
-      // 마우스 버튼
       function mouseButtonName(button) {
         if (button === 0) return "left";
         if (button === 1) return "middle";
@@ -297,72 +324,38 @@ HTML_PAGE = r"""
         if (!hasControl) return;
         e.preventDefault();
         const p = normalizePointerFromEvent(e);
-        sendControlMessage({
-          type: "mouse_down",
-          x: p.x,
-          y: p.y,
-          button: mouseButtonName(e.button)
-        });
+        sendControlMessage({ type: "mouse_down", x: p.x, y: p.y, button: mouseButtonName(e.button) });
       });
 
       videoEl.addEventListener("mouseup", (e) => {
         if (!hasControl) return;
         e.preventDefault();
         const p = normalizePointerFromEvent(e);
-        sendControlMessage({
-          type: "mouse_up",
-          x: p.x,
-          y: p.y,
-          button: mouseButtonName(e.button)
-        });
+        sendControlMessage({ type: "mouse_up", x: p.x, y: p.y, button: mouseButtonName(e.button) });
       });
 
-      // 휠 스크롤
       videoEl.addEventListener("wheel", (e) => {
         if (!hasControl) return;
         e.preventDefault();
-        sendControlMessage({
-          type: "mouse_wheel",
-          deltaY: e.deltaY
-        });
+        sendControlMessage({ type: "mouse_wheel", deltaY: e.deltaY });
       }, { passive: false });
 
-      // 키보드 입력
-      // 브라우저 기본 동작과 충돌 가능한 키는 일부 막습니다.
       document.addEventListener("keydown", (e) => {
         if (!hasControl) return;
-
-        // 입력 중복 전송 방지
         if (keyState.has(e.code)) return;
         keyState.add(e.code);
+        if (["F5", "F11"].includes(e.key)) e.preventDefault();
 
-        // 브라우저 단축키 영향 최소화
-        const reserved = ["F5"];
-        if (reserved.includes(e.key)) {
-          e.preventDefault();
-        }
-
-        sendControlMessage({
-          type: "key_down",
-          key: e.key,
-          code: e.code
-        });
+        sendControlMessage({ type: "key_down", key: e.key, code: e.code });
       });
 
       document.addEventListener("keyup", (e) => {
         if (!hasControl) return;
         keyState.delete(e.code);
-
-        sendControlMessage({
-          type: "key_up",
-          key: e.key,
-          code: e.code
-        });
+        sendControlMessage({ type: "key_up", key: e.key, code: e.code });
       });
 
-      window.addEventListener("blur", () => {
-        keyState.clear();
-      });
+      window.addEventListener("blur", () => { keyState.clear(); });
     }
 
     async function start() {
@@ -370,73 +363,34 @@ HTML_PAGE = r"""
       const controlToken = document.getElementById("controlToken").value.trim();
       const requestControl = document.getElementById("requestControl").checked;
 
-      if (!accessToken) {
-        setStatus("보기 토큰을 입력하세요.", "danger");
-        return;
-      }
+      if (!accessToken) { setStatus("보기 토큰을 입력하세요.", "danger"); return; }
 
       try {
         await disconnect(false);
-
         setStatus("RTCPeerConnection 생성 중...");
         hasControl = false;
         updateControlBadge();
 
-        pc = new RTCPeerConnection({
-          iceServers: []
-        });
-
-        // 비디오 수신만
+        pc = new RTCPeerConnection({ iceServers: [] });
         pc.addTransceiver("video", { direction: "recvonly" });
-
-        // 제어용 데이터채널 생성
         controlChannel = pc.createDataChannel("control");
 
-        controlChannel.onopen = () => {
-          setStatus("데이터채널 연결됨", "ok");
-        };
-
-        controlChannel.onclose = () => {
-          setStatus("데이터채널 종료", "warn");
-          hasControl = false;
-          updateControlBadge();
-        };
-
+        controlChannel.onopen = () => { setStatus("데이터채널 연결됨", "ok"); };
+        controlChannel.onclose = () => { setStatus("데이터채널 종료", "warn"); hasControl = false; updateControlBadge(); };
         controlChannel.onmessage = (event) => {
           try {
             const msg = JSON.parse(event.data);
-
             if (msg.type === "control_status") {
               hasControl = !!msg.granted;
               updateControlBadge();
-
-              if (hasControl) {
-                setStatus("영상 연결 완료 / 제어권 활성", "ok");
-              } else {
-                setStatus("영상 연결 완료 / 보기 전용", "warn");
-              }
-            } else if (msg.type === "server_info") {
-              console.log("server_info:", msg);
+              setStatus(hasControl ? "영상 연결 완료 / 제어권 활성" : "영상 연결 완료 / 보기 전용", hasControl ? "ok" : "warn");
             } else if (msg.type === "error") {
               setStatus("서버 오류: " + msg.message, "danger");
             }
-          } catch (err) {
-            console.error(err);
-          }
+          } catch (err) { console.error(err); }
         };
 
-        pc.ontrack = (event) => {
-          videoEl.srcObject = event.streams[0];
-        };
-
-        pc.onconnectionstatechange = () => {
-          setStatus("connectionState = " + pc.connectionState);
-        };
-
-        pc.oniceconnectionstatechange = () => {
-          setStatus("iceConnectionState = " + pc.iceConnectionState);
-        };
-
+        pc.ontrack = (event) => { videoEl.srcObject = event.streams[0]; };
         setStatus("Offer 생성 중...");
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
@@ -447,9 +401,7 @@ HTML_PAGE = r"""
         setStatus("서버에 Offer 전송 중...");
         const res = await fetch("/offer", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             sdp: pc.localDescription.sdp,
             type: pc.localDescription.type,
@@ -459,26 +411,13 @@ HTML_PAGE = r"""
           })
         });
 
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error("서버 응답 오류: " + res.status + " / " + text);
-        }
-
+        if (!res.ok) throw new Error("서버 응답 오류: " + res.status);
         const answer = await res.json();
-
-        await pc.setRemoteDescription(new RTCSessionDescription({
-          sdp: answer.sdp,
-          type: answer.type
-        }));
+        await pc.setRemoteDescription(new RTCSessionDescription({ sdp: answer.sdp, type: answer.type }));
 
         hasControl = !!answer.control_granted;
         updateControlBadge();
-
-        if (hasControl) {
-          setStatus("연결 성공 / 제어권 활성", "ok");
-        } else {
-          setStatus("연결 성공 / 보기 전용", "warn");
-        }
+        setStatus(hasControl ? "연결 성공 / 제어권 활성" : "연결 성공 / 보기 전용", hasControl ? "ok" : "warn");
       } catch (err) {
         console.error(err);
         setStatus("오류: " + err.message, "danger");
@@ -487,34 +426,17 @@ HTML_PAGE = r"""
 
     async function disconnect(updateMessage = true) {
       try {
-        if (controlChannel) {
-          try { controlChannel.close(); } catch (_) {}
-          controlChannel = null;
-        }
-
+        if (controlChannel) { try { controlChannel.close(); } catch (_) {} controlChannel = null; }
         if (pc) {
-          try {
-            pc.getSenders().forEach(s => {
-              try { s.track && s.track.stop && s.track.stop(); } catch (_) {}
-            });
-          } catch (_) {}
-
-          try { pc.close(); } catch (_) {}
-          pc = null;
+          try { pc.getSenders().forEach(s => { s.track && s.track.stop && s.track.stop(); }); } catch (_) {}
+          try { pc.close(); } catch (_) {} pc = null;
         }
-
         videoEl.srcObject = null;
         hasControl = false;
         keyState.clear();
         updateControlBadge();
-
-        if (updateMessage) {
-          setStatus("연결 종료됨");
-        }
-      } catch (err) {
-        console.error(err);
-        setStatus("종료 중 오류: " + err.message, "danger");
-      }
+        if (updateMessage) setStatus("연결 종료됨");
+      } catch (err) { console.error(err); setStatus("종료 중 오류: " + err.message, "danger"); }
     }
 
     document.getElementById("startBtn").addEventListener("click", start);
@@ -665,7 +587,7 @@ def perform_input_message(msg: dict, monitor_info: dict):
 
     if msg_type == "mouse_move":
         x, y = normalize_to_screen(msg.get("x", 0), msg.get("y", 0), monitor_info)
-        pyautogui.moveTo(x, y)
+        pyautogui.moveTo(x, y, _pause=False)
 
     elif msg_type == "mouse_down":
         x, y = normalize_to_screen(msg.get("x", 0), msg.get("y", 0), monitor_info)
@@ -707,7 +629,7 @@ def create_app(args):
     # 공용 상태
     app["pcs"] = set()                  # 활성 PeerConnection 집합
     app["pc_meta"] = {}                 # pc_id -> 메타 정보
-    app["controller_id"] = None         # 현재 제어권 보유 pc_id
+    app["state"] = {"controller_id": None}    
     app["max_clients"] = 2
     app["access_token"] = args.access_token
     app["control_token"] = args.control_token
@@ -728,7 +650,7 @@ def create_app(args):
 
     async def health(request):
         current_count = len(app["pcs"])
-        controller_id = app["controller_id"]
+        controller_id = app["state"]["controller_id"]        
         data = {
             "ok": True,
             "current_clients": current_count,
@@ -762,7 +684,7 @@ def create_app(args):
         control_granted = False
         if request_control:
             # 제어 토큰이 맞고, 아직 제어권자가 없을 때만 부여
-            if control_token == app["control_token"] and app["controller_id"] is None:
+            if control_token == app["control_token"] and app["state"][" controller_id"] is None:
                 control_granted = True
             else:
                 control_granted = False
@@ -782,9 +704,8 @@ def create_app(args):
         }
 
         if control_granted:
-            app["controller_id"] = pc_id
+            app["state"]["controller_id"] = pc_id
             app["pc_meta"][pc_id]["is_controller"] = True
-
         logger.info("Peer 생성: %s / 현재 접속자 수=%d", pc_id, len(app["pcs"]))
 
         # 연결 상태 변화 처리
@@ -846,22 +767,36 @@ def create_app(args):
                     except Exception:
                         pass
 
-        # 공용 화면 소스를 relay로 구독
+# [기존] video_track = app["relay"].subscribe(app["screen_source"])
+        #        pc.addTrack(video_track)
+        
+        # 👇 1단계: 텍스트 가독성 최적화 힌트 삽입
         video_track = app["relay"].subscribe(app["screen_source"])
-        pc.addTrack(video_track)
+        sender = pc.addTrack(video_track)
+        
+        # WebRTC에게 이 트랙이 '화면 공유(텍스트/디테일 중요)'임을 강제로 알림
+        # 브라우저가 움직임 보다는 화질(디테일)을 유지하는 데 비트레이트를 몰아줍니다.
+        if hasattr(sender, "track") and sender.track:
+            sender.track.contentHint = "text" 
 
         # Offer -> Answer
         await pc.setRemoteDescription(offer)
         answer = await pc.createAnswer()
+        
+        # 👇 2단계: SDP 조작을 통해 대역폭을 20Mbps(20000)로 폭발적으로 상향 및 인코딩 프로파일 고정
+        new_sdp = []
+        for line in answer.sdp.splitlines():
+            new_sdp.append(line)
+            if line.startswith("m=video"):
+                # 20000kbps = 20Mbps (로컬/LAN 환경에서는 거의 딜레이 없이 원본 화질 전송 가능)
+                new_sdp.append("b=AS:20000") 
+                
+        answer = RTCSessionDescription(
+            sdp="\r\n".join(new_sdp) + "\r\n", 
+            type=answer.type
+        )
+        
         await pc.setLocalDescription(answer)
-
-        logger.info("Peer %s answer 생성 완료 / control_granted=%s", pc_id, control_granted)
-
-        return web.json_response({
-            "sdp": pc.localDescription.sdp,
-            "type": pc.localDescription.type,
-            "control_granted": control_granted,
-        })
 
     async def on_shutdown(app):
         logger.info("서버 종료 중... 모든 PeerConnection 정리")
@@ -878,7 +813,7 @@ def create_app(args):
 
         app["pcs"].clear()
         app["pc_meta"].clear()
-        app["controller_id"] = None
+        app["state"]["controller_id"] = None
 
     app.router.add_get("/", index)
     app.router.add_get("/health", health)
@@ -912,8 +847,8 @@ async def cleanup_peer(app, pc_id: str):
         pass
 
     # 제어권자였다면 제어권 해제
-    if is_controller and app["controller_id"] == pc_id:
-        app["controller_id"] = None
+    if is_controller and app["state"]["controller_id"] == pc_id:
+        app["state"]["controller_id"] = None
         logger.info("제어권 해제됨: %s", pc_id)
 
     app["pc_meta"].pop(pc_id, None)

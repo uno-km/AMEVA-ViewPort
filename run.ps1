@@ -1,7 +1,8 @@
 $ErrorActionPreference = "Stop"
 Set-Location -Path $PSScriptRoot
 
-$PORT = 130000
+$PORT = 13000
+
 
 Write-Host "=========================================="
 Write-Host "WebRTC Screen Share + Control Launcher"
@@ -61,14 +62,14 @@ python -m pip install -r requirements.txt
 # ---------------------------------------------------------
 # Read runtime options
 # ---------------------------------------------------------
-$accessToken = Read-Host "Enter view token [default: 91199837]"
+$accessToken = Read-Host "Enter view token [default: 0000]"
 if ([string]::IsNullOrWhiteSpace($accessToken)) {
-    $accessToken = "91199837"
+    $accessToken = "0000"
 }
 
-$controlToken = Read-Host "Enter control token [default: 91199837]"
+$controlToken = Read-Host "Enter control token [default: 0000]"
 if ([string]::IsNullOrWhiteSpace($controlToken)) {
-    $controlToken = "91199837"
+    $controlToken = "0000"
 }
 
 $monitorIndex = Read-Host "Enter monitor index [default: 1]"
@@ -76,14 +77,14 @@ if ([string]::IsNullOrWhiteSpace($monitorIndex)) {
     $monitorIndex = "1"
 }
 
-$fps = Read-Host "Enter FPS [default: 15]"
+$fps = Read-Host "Enter FPS [default: 30]"
 if ([string]::IsNullOrWhiteSpace($fps)) {
-    $fps = "15"
+    $fps = "30"
 }
 
-$scale = Read-Host "Enter scale factor [default: 2]"
+$scale = Read-Host "Enter scale factor [default: 1]"
 if ([string]::IsNullOrWhiteSpace($scale)) {
-    $scale = "2"
+    $scale = "1"
 }
 
 # ---------------------------------------------------------
