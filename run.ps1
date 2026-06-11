@@ -142,6 +142,46 @@ Write-Host "[INFO] Scale          : $scale"
 Write-Host "========================================================="
 Write-Host ""
 
+# ---------------------------------------------------------
+# Kill any existing process using port
+# ---------------------------------------------------------
+Write-Host "[INFO] Checking if port $PORT is in use..." -ForegroundColor Cyan
+
+try {
+    $connections = netstat -ano | findstr ":$PORT"
+
+    if ($connections) {
+        $pids = @()
+
+        foreach ($line in $connections) {
+            $tokens = ($line -split '\s+') | Where-Object { $_ }
+            $pid = $tokens[-1]
+
+            if ($pid -match '^\d+$') {
+                $pids += $pid
+            }
+        }
+
+        # 중복 PID 제거
+        $pids = $pids | Select-Object -Unique
+
+        foreach ($pid in $pids) {
+            Write-Host "[WARN] Killing process using port $PORT (PID: $pid)" -ForegroundColor Yellow
+            taskkill /PID $pid /F | Out-Null
+        }
+
+        Start-Sleep -Milliseconds 500
+        Write-Host "[INFO] Port $PORT released successfully." -ForegroundColor Green
+    }
+    else {
+        Write-Host "[INFO] Port $PORT is available." -ForegroundColor Green
+    }
+}
+catch {
+    Write-Host "[WARN] Failed to check/kill port process: $_" -ForegroundColor Yellow
+}
+
+Write-Host ""
 Write-Host "[INFO] Starting server..." -ForegroundColor Cyan
 Write-Host ""
 
