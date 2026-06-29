@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 Set-Location -Path $PSScriptRoot
 
-$PORT = 13000
+$PORT = 6974
 
 
 Write-Host "=========================================="
